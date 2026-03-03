@@ -445,4 +445,5 @@ app.post(
 
 app.get("/", (_, res) => res.json({ status: "ok", service: "StreamVault API" }));
 
-app.listen(8000, () => console.log("StreamVault API running on port 8000"));
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => console.log(`StreamVault API running on port ${PORT}`));
