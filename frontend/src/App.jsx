@@ -7,6 +7,9 @@ import CourseCatalog from './pages/CourseCatalog';
 import AdminDashboard from './pages/AdminDashboard';
 import './index.css';
 
+// In dev: Vite proxy handles relative paths → localhost:8000
+// In production: VITE_API_URL points to the Render backend
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
 axios.defaults.withCredentials = true;
 
 // Screen enum

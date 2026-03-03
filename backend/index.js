@@ -25,6 +25,7 @@ const SALT_ROUNDS = 10;
 
 const dbConfig = {
   host: process.env.DB_HOST || "localhost",
+  port: parseInt(process.env.DB_PORT || "3306"),
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "",
   multipleStatements: true,
@@ -40,7 +41,7 @@ async function initDatabase() {
 
     pool = mysql.createPool({
       ...dbConfig,
-      database: "secure_streaming",
+      database: process.env.DB_NAME || "secure_streaming",
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
@@ -134,7 +135,12 @@ const upload = multer({ storage });
 // Middleware
 // ─────────────────────────────────────────────────────────────
 
-app.use(cors({ origin: ["http://localhost:3000", "http://localhost:5173"], credentials: true }));
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -257,7 +263,12 @@ app.post("/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    res.cookie("token", token, { httpOnly: false, secure: false, sameSite: "lax" });
+    const isProd = process.env.NODE_ENV === "production";
+    res.cookie("token", token, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+    });
     return res.json({
       message: `Welcome back!`,
       token,
@@ -414,10 +425,11 @@ app.post(
         );
         console.log(`Course created: ${title} → ${lessonId}`);
 
+        const baseUrl = process.env.BACKEND_URL || `http://localhost:8000`;
         return res.json({
           message: "Video processed and course created.",
           lessonId,
-          videoUrl: `http://localhost:8000/uploads/courses/${lessonId}/index.m3u8`,
+          videoUrl: `${baseUrl}/uploads/courses/${lessonId}/index.m3u8`,
         });
       } catch (dbErr) {
         console.error("Course DB insert error:", dbErr);
