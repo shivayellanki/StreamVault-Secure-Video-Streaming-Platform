@@ -12,6 +12,16 @@ import './index.css';
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
 axios.defaults.withCredentials = true;
 
+// Attach Bearer token to all requests to bypass cross-domain cookie blocks
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+
 // Screen enum
 const SCREEN = { LOGIN: 'login', REGISTER: 'register' };
 
@@ -24,6 +34,7 @@ export default function App() {
   const handleLogout = async () => {
     try { await axios.post('/logout'); } catch { /* ignore */ }
     document.cookie = 'token=; Max-Age=0; path=/;';
+    localStorage.removeItem('token');
     setUser(null);
     setScreen(SCREEN.LOGIN);
     toast.success('Signed out');

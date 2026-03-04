@@ -12,6 +12,9 @@ export default function LoginPage({ onLogin, onSwitchToRegister }) {
         try {
             setLoading(true);
             const res = await axios.post('/login', { email, password });
+            if (res.data.token) {
+                localStorage.setItem('token', res.data.token);
+            }
             toast.success(`Welcome back!`);
             onLogin({ email: res.data.email, role: res.data.role });
         } catch (err) {
