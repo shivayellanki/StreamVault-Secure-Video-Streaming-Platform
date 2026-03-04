@@ -138,10 +138,15 @@ const upload = multer({ storage });
 // Middleware
 // ─────────────────────────────────────────────────────────────
 
+const rawFrontendUrl = process.env.FRONTEND_URL || "";
+const cleanFrontendUrl = rawFrontendUrl.endsWith("/")
+  ? rawFrontendUrl.slice(0, -1)
+  : rawFrontendUrl;
+
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
-  process.env.FRONTEND_URL,
+  cleanFrontendUrl,
 ].filter(Boolean);
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(cookieParser());
