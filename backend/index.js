@@ -201,7 +201,18 @@ const requireOwnership = async (req, res, next) => {
 };
 
 // Protect /uploads — must be logged in AND own the course
-app.use("/uploads", authMiddleware, requireOwnership, express.static("uploads"));
+app.use(
+  "/uploads",
+  authMiddleware,
+  requireOwnership,
+  (req, res, next) => {
+    res.header("Access-Control-Allow-Origin", req.headers.origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    next();
+  },
+  express.static("uploads")
+);
 
 // ─────────────────────────────────────────────────────────────
 // Auth routes
@@ -380,6 +391,9 @@ app.get("/api/keys/:lessonId", authMiddleware, requireOwnership, (req, res) => {
   const { lessonId } = req.params;
   const keyPath = `./uploads/courses/${lessonId}/key.key`;
   if (fs.existsSync(keyPath)) {
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
     return res.sendFile(path.resolve(keyPath));
   }
   return res.status(404).json({ message: "Key not found." });
