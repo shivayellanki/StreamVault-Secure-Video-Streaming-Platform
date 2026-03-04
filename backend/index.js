@@ -432,7 +432,7 @@ app.post(
     fs.writeFileSync(keyPath, key);
     fs.writeFileSync(keyInfoPath, `${keyUrl}\n${keyPath}`);
 
-    const ffmpegCmd = `ffmpeg -i ${videoPath} -codec:v libx264 -codec:a aac -hls_time 10 -hls_playlist_type vod -hls_key_info_file ${keyInfoPath} -hls_segment_filename "${outputPath}/segment%03d.ts" -start_number 0 ${hlsPath}`;
+    const ffmpegCmd = `ffmpeg -i ${videoPath} -codec:v libx264 -preset ultrafast -threads 1 -codec:a aac -hls_time 10 -hls_playlist_type vod -hls_key_info_file ${keyInfoPath} -hls_segment_filename "${outputPath}/segment%03d.ts" -start_number 0 ${hlsPath}`;
 
     exec(ffmpegCmd, async (error) => {
       if (error) {
