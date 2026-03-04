@@ -13,8 +13,10 @@ const VideoPlayer = ({ videoUrl }) => {
         if (Hls.isSupported()) {
             hls = new Hls({
                 xhrSetup(xhr) {
-                    // Send session cookies on every HLS sub-request (key fetch, segments, etc.)
-                    xhr.withCredentials = true;
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
                 },
             });
 
