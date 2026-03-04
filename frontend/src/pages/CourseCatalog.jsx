@@ -54,7 +54,9 @@ export default function CourseCatalog({ userEmail }) {
                             <span>{courses.find((c) => c.lesson_id === watchingId)?.title ?? 'Course'}</span>
                             <button className="btn btn-ghost" onClick={() => setWatchingId(null)}>✕ Close</button>
                         </div>
-                        <VideoPlayer videoUrl={`/uploads/courses/${watchingId}/index.m3u8`} />
+                        <VideoPlayer
+                            videoUrl={`${import.meta.env.VITE_API_URL || ''}/uploads/courses/${watchingId}/index.m3u8`}
+                        />
                     </div>
                 </div>
             )}
