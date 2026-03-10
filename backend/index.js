@@ -11,6 +11,7 @@ import cookieParser from "cookie-parser";
 import { exec } from "child_process";
 import mysql from "mysql2/promise";
 import bcrypt from "bcrypt";
+import { uploadFileToS3, getFileFromS3, getS3Url } from "./s3.js";
 
 const app = express();
 
@@ -392,16 +393,26 @@ app.post("/api/purchase", authMiddleware, async (req, res) => {
 // Key delivery (protected)
 // ─────────────────────────────────────────────────────────────
 
-app.get("/api/keys/:lessonId", authMiddleware, requireOwnership, (req, res) => {
+app.get("/api/keys/:lessonId", authMiddleware, requireOwnership, async (req, res) => {
   const { lessonId } = req.params;
-  const keyPath = `./uploads/courses/${lessonId}/key.key`;
-  if (fs.existsSync(keyPath)) {
+  const s3Key = `courses/${lessonId}/key.key`;
+
+  try {
     res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
     res.header("Access-Control-Allow-Credentials", "true");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-    return res.sendFile(path.resolve(keyPath));
+    res.header("Content-Type", "application/octet-stream");
+
+    // Fetch the key stream from S3
+    const keyStream = await getFileFromS3(s3Key);
+    keyStream.pipe(res);
+  } catch (err) {
+    if (err.name === 'NoSuchKey') {
+      return res.status(404).json({ message: "Key not found." });
+    }
+    console.error("Error fetching key from S3:", err);
+    return res.status(500).json({ message: "Server error fetching key." });
   }
-  return res.status(404).json({ message: "Key not found." });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -427,7 +438,8 @@ app.post(
     const key = crypto.randomBytes(16);
     const keyPath = `${outputPath}/key.key`;
     const keyInfoPath = `${outputPath}/key.info`;
-    const keyUrl = `/api/keys/${lessonId}`;
+    const backendUrl = process.env.BACKEND_URL || `http://localhost:8000`;
+    const keyUrl = `${backendUrl}/api/keys/${lessonId}`;
 
     fs.writeFileSync(keyPath, key);
     fs.writeFileSync(keyInfoPath, `${keyUrl}\n${keyPath}`);
@@ -441,21 +453,37 @@ app.post(
       }
 
       try {
+        if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+
+        // Upload all generated files to S3
+        const filesToUpload = fs.readdirSync(outputPath);
+        for (const file of filesToUpload) {
+          const filePath = path.join(outputPath, file);
+          const s3Key = `courses/${lessonId}/${file}`;
+          let contentType = "application/octet-stream";
+          if (file.endsWith(".m3u8")) contentType = "application/vnd.apple.mpegurl";
+          else if (file.endsWith(".ts")) contentType = "video/MP2T";
+
+          await uploadFileToS3(filePath, s3Key, contentType);
+        }
+
+        // Delete local output path after successful upload
+        fs.rmSync(outputPath, { recursive: true, force: true });
+
         await pool.query(
           "INSERT INTO courses (lesson_id, title, description, price) VALUES (?, ?, ?, ?)",
           [lessonId, title, description, parseFloat(price)]
         );
-        console.log(`Course created: ${title} → ${lessonId}`);
+        console.log(`Course created dynamically and uploaded to S3: ${title} → ${lessonId}`);
 
-        const baseUrl = process.env.BACKEND_URL || `http://localhost:8000`;
         return res.json({
-          message: "Video processed and course created.",
+          message: "Video processed and course created successfully.",
           lessonId,
-          videoUrl: `${baseUrl}/uploads/courses/${lessonId}/index.m3u8`,
+          videoUrl: getS3Url(`courses/${lessonId}/index.m3u8`),
         });
-      } catch (dbErr) {
-        console.error("Course DB insert error:", dbErr);
-        return res.status(500).json({ message: "Video processed but failed to save course." });
+      } catch (err) {
+        console.error("Course processing error:", err);
+        return res.status(500).json({ message: "Video processed but failed to complete setup." });
       }
     });
   }

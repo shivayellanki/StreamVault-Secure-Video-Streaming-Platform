@@ -12,9 +12,10 @@ const VideoPlayer = ({ videoUrl }) => {
 
         if (Hls.isSupported()) {
             hls = new Hls({
-                xhrSetup(xhr) {
+                xhrSetup(xhr, url) {
                     const token = localStorage.getItem('token');
-                    if (token) {
+                    // Only send authorization header to our backend for the key
+                    if (token && url.includes('/api/keys/')) {
                         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                     }
                 },
