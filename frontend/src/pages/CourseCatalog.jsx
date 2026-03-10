@@ -55,7 +55,11 @@ export default function CourseCatalog({ userEmail }) {
                             <button className="btn btn-ghost" onClick={() => setWatchingId(null)}>✕ Close</button>
                         </div>
                         <VideoPlayer
-                            videoUrl={`${import.meta.env.VITE_API_URL || ''}/uploads/courses/${watchingId}/index.m3u8`}
+                            videoUrl={
+                                // If the DB saved a full S3 URL in a future videoUrl column, we'd use it here.
+                                // For now, we construct the S3 URL since we know the bucket pattern.
+                                `https://${import.meta.env.VITE_AWS_S3_BUCKET_NAME || 'streamvault-videos-shiva'}.s3.${import.meta.env.VITE_AWS_REGION || 'ap-south-1'}.amazonaws.com/courses/${watchingId}/index.m3u8`
+                            }
                         />
                     </div>
                 </div>
