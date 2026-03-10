@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import path from "path";
 
@@ -47,4 +47,39 @@ export const getFileFromS3 = async (s3Key) => {
 
 export const getS3Url = (s3Key) => {
     return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+};
+
+export const deleteFolderFromS3 = async (prefix) => {
+    try {
+        let isTruncated = true;
+        let continuationToken = undefined;
+
+        while (isTruncated) {
+            const listParams = {
+                Bucket: BUCKET_NAME,
+                Prefix: prefix,
+                ContinuationToken: continuationToken
+            };
+            const listResult = await s3Client.send(new ListObjectsV2Command(listParams));
+
+            if (!listResult.Contents || listResult.Contents.length === 0) {
+                break; // Nothing to delete
+            }
+
+            const objectsToDelete = listResult.Contents.map(obj => ({ Key: obj.Key }));
+
+            const deleteParams = {
+                Bucket: BUCKET_NAME,
+                Delete: { Objects: objectsToDelete }
+            };
+            await s3Client.send(new DeleteObjectsCommand(deleteParams));
+
+            isTruncated = listResult.IsTruncated;
+            continuationToken = listResult.NextContinuationToken;
+        }
+        console.log(`Successfully deleted S3 folder: ${prefix}`);
+    } catch (err) {
+        console.error("Error deleting folder from S3:", err);
+        // Don't throw, we'll allow DB deletion even if S3 fails or is already empty
+    }
 };

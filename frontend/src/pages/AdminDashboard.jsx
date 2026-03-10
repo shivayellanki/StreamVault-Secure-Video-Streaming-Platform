@@ -8,6 +8,7 @@ export default function AdminDashboard() {
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [editingCourse, setEditingCourse] = useState(null); // { lesson_id, title, description, price }
 
     const fetchCourses = async () => {
         try {
@@ -55,8 +56,64 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleDelete = async (lessonId, title) => {
+        if (!window.confirm(`Are you sure you want to permanently delete "${title}"? This will also remove the video from S3.`)) return;
+
+        try {
+            toast.loading('Deleting course...', { id: 'delete' });
+            await axios.delete(`/api/courses/${lessonId}`);
+            toast.success('Course deleted.', { id: 'delete' });
+            await fetchCourses();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Delete failed.', { id: 'delete' });
+        }
+    };
+
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            toast.loading('Saving changes...', { id: 'edit' });
+            await axios.put(`/api/courses/${editingCourse.lesson_id}`, {
+                title: editingCourse.title,
+                description: editingCourse.description,
+                price: editingCourse.price,
+            });
+            toast.success('Course updated.', { id: 'edit' });
+            setEditingCourse(null);
+            await fetchCourses();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Update failed.', { id: 'edit' });
+        }
+    };
+
     return (
         <div className="section-stack">
+            {editingCourse && (
+                <div className="modal-overlay" onClick={() => setEditingCourse(null)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <h2>Edit Course</h2>
+                        <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                            <div className="field">
+                                <label>Title</label>
+                                <input className="input" type="text" value={editingCourse.title} onChange={e => setEditingCourse({ ...editingCourse, title: e.target.value })} required />
+                            </div>
+                            <div className="field">
+                                <label>Description</label>
+                                <textarea className="input textarea" rows={3} value={editingCourse.description || ''} onChange={e => setEditingCourse({ ...editingCourse, description: e.target.value })} />
+                            </div>
+                            <div className="field">
+                                <label>Price (₹)</label>
+                                <input className="input" type="number" min="0" step="0.01" value={editingCourse.price} onChange={e => setEditingCourse({ ...editingCourse, price: e.target.value })} required />
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                                <button type="button" className="btn btn-ghost" onClick={() => setEditingCourse(null)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             <div>
                 <h2 className="page-title">Admin Dashboard</h2>
                 <p className="page-subtitle">Upload courses and manage the library.</p>
@@ -146,6 +203,7 @@ export default function AdminDashboard() {
                                     <th>Price</th>
                                     <th>Lesson ID</th>
                                     <th>Created</th>
+                                    <th style={{ textAlign: 'right' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -158,6 +216,12 @@ export default function AdminDashboard() {
                                         </td>
                                         <td className="text-muted">
                                             {new Date(c.created_at).toLocaleDateString('en-IN')}
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }} onClick={() => setEditingCourse({ ...c })}>Edit</button>
+                                                <button className="btn btn-danger" style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', backgroundColor: '#dc2626', color: 'white', border: 'none' }} onClick={() => handleDelete(c.lesson_id, c.title)}>Delete</button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

@@ -11,7 +11,7 @@ import cookieParser from "cookie-parser";
 import { exec } from "child_process";
 import mysql from "mysql2/promise";
 import bcrypt from "bcrypt";
-import { uploadFileToS3, getFileFromS3, getS3Url } from "./s3.js";
+import { uploadFileToS3, getFileFromS3, getS3Url, deleteFolderFromS3 } from "./s3.js";
 
 const app = express();
 
@@ -335,6 +335,52 @@ app.get("/api/my-courses", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("My-courses fetch error:", err);
     return res.status(500).json({ message: "Failed to load your courses." });
+  }
+});
+
+// Edit course (Admin only)
+app.put("/api/courses/:lessonId", authMiddleware, adminMiddleware, async (req, res) => {
+  const { lessonId } = req.params;
+  const { title, description, price } = req.body;
+
+  if (!title) return res.status(400).json({ message: "Title is required" });
+
+  try {
+    await pool.query(
+      "UPDATE courses SET title = ?, description = ?, price = ? WHERE lesson_id = ?",
+      [title, description, price || 0, lessonId]
+    );
+    return res.json({ message: "Course updated successfully." });
+  } catch (err) {
+    console.error("Course update error:", err);
+    return res.status(500).json({ message: "Failed to update course." });
+  }
+});
+
+// Delete course (Admin only)
+app.delete("/api/courses/:lessonId", authMiddleware, adminMiddleware, async (req, res) => {
+  const { lessonId } = req.params;
+
+  try {
+    // 1. Delete associated purchases to satisfy foreign key constraints
+    await pool.query("DELETE FROM purchases WHERE lesson_id = ?", [lessonId]);
+
+    // 2. Delete the course record
+    const [result] = await pool.query("DELETE FROM courses WHERE lesson_id = ?", [lessonId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Course not found." });
+    }
+
+    // 3. Delete from S3 in background (don't block the response if it's slow)
+    deleteFolderFromS3(`courses/${lessonId}/`).catch(err => {
+      console.error(`Failed to delete S3 folder for ${lessonId}:`, err);
+    });
+
+    return res.json({ message: "Course deleted successfully." });
+  } catch (err) {
+    console.error("Course deletion error:", err);
+    return res.status(500).json({ message: "Failed to delete course." });
   }
 });
 
