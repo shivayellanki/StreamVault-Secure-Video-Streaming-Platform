@@ -484,7 +484,7 @@ app.post(
     const key = crypto.randomBytes(16);
     const keyPath = `${outputPath}/key.key`;
     const keyInfoPath = `${outputPath}/key.info`;
-    const backendUrl = process.env.BACKEND_URL || `http://localhost:8000`;
+    const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:8000`;
     const keyUrl = `${backendUrl}/api/keys/${lessonId}`;
 
     fs.writeFileSync(keyPath, key);
